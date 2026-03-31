@@ -35,12 +35,13 @@ def build_features(dataset: DatasetBundle, candidates: pd.DataFrame, split: Spli
         split.train_interactions.groupby(ITEM_ID_COL)[LABEL_COL].mean().rename("item_positive_rate")
     )
 
+    genre_cols = [column for column in items.columns if str(column).startswith("genre_")]
     rows = []
-    for candidate in candidates.itertuples(index=False):
-        user_id = candidate.user_id
-        item_id = candidate.item_id
-        query_timestamp = candidate.query_timestamp
-        query_interaction_id = candidate.query_interaction_id
+    for _, query_group in candidates.groupby("query_id", sort=False):
+        query_row = query_group.iloc[0]
+        user_id = query_row[USER_ID_COL]
+        query_timestamp = query_row[QUERY_TIMESTAMP_COL]
+        query_interaction_id = query_row[QUERY_INTERACTION_ID_COL]
 
         user_history = _history_before_query(
             train_interactions,
@@ -48,44 +49,51 @@ def build_features(dataset: DatasetBundle, candidates: pd.DataFrame, split: Spli
             query_timestamp=query_timestamp,
             query_interaction_id=query_interaction_id,
         )
-        item_meta = items.loc[item_id] if item_id in items.index else pd.Series(dtype=object)
         user_meta = users.loc[user_id] if user_id in users.index else pd.Series(dtype=object)
         history_summary = summarize_history(user_history)
-
-        row = candidate._asdict()
-        row.update(history_summary)
-        row["days_since_last_interaction"] = recency_in_days(user_history, query_timestamp)
-        row["user_age"] = _coerce_numeric(user_meta.get("age"), default=0.0)
-        row["user_gender"] = str(user_meta.get("gender", "unknown"))
-        row["user_occupation"] = str(user_meta.get("occupation", "unknown"))
-        row["item_primary_category"] = str(item_meta.get(dataset.context_col, "unknown"))
-        row["item_brand"] = str(item_meta.get("brand", "unknown"))
-        row["item_price"] = _coerce_numeric(item_meta.get("price"), default=0.0)
-        row["item_release_year"] = _coerce_numeric(item_meta.get("release_year"), default=0.0)
-        row["item_genre_count"] = _coerce_numeric(item_meta.get("genre_count"), default=0.0)
-        row["item_category_depth"] = _coerce_numeric(item_meta.get("category_depth"), default=0.0)
-        row["item_popularity"] = float(popularity.get(item_id, 0.0))
-        row["item_positive_rate"] = float(item_positive_rate.get(item_id, 0.0))
-        row["item_is_cold"] = float(item_id in split.cold_item_ids)
-        row["price_missing"] = float(pd.isna(item_meta.get("price")))
-
         history_categories = user_history.get(f"item__{dataset.context_col}", pd.Series(dtype=object))
-        row["category_affinity"] = safe_affinity_count(history_categories, item_meta.get(dataset.context_col))
         history_brands = user_history.get("item__brand", pd.Series(dtype=object))
-        row["brand_affinity"] = safe_affinity_count(history_brands, item_meta.get("brand"))
-        row["same_item_history"] = float((user_history[ITEM_ID_COL] == item_id).sum()) if not user_history.empty else 0.0
-        row["user_avg_history_price"] = numeric_average(user_history, "item__price")
-        row["price_distance_to_user_avg"] = abs(row["item_price"] - row["user_avg_history_price"])
-        row["history_positive_same_category"] = float(
-            (
-                (history_categories.astype(str) == str(item_meta.get(dataset.context_col, "unknown")))
-                & (user_history[LABEL_COL] == 1)
-            ).sum()
-        ) if not user_history.empty and dataset.context_col in item_meta.index else 0.0
+        user_avg_history_price = numeric_average(user_history, "item__price")
+        days_since_last = recency_in_days(user_history, query_timestamp)
+        base_features = {
+            **history_summary,
+            "days_since_last_interaction": days_since_last,
+            "user_age": _coerce_numeric(user_meta.get("age"), default=0.0),
+            "user_gender": str(user_meta.get("gender", "unknown")),
+            "user_occupation": str(user_meta.get("occupation", "unknown")),
+            "user_avg_history_price": user_avg_history_price,
+        }
 
-        for genre_col in [column for column in items.columns if str(column).startswith("genre_")]:
-            row[f"feat_{genre_col}"] = _coerce_numeric(item_meta.get(genre_col), default=0.0)
-        rows.append(row)
+        for candidate in query_group.itertuples(index=False):
+            item_id = candidate.item_id
+            item_meta = items.loc[item_id] if item_id in items.index else pd.Series(dtype=object)
+
+            row = candidate._asdict()
+            row.update(base_features)
+            row["item_primary_category"] = str(item_meta.get(dataset.context_col, "unknown"))
+            row["item_brand"] = str(item_meta.get("brand", "unknown"))
+            row["item_price"] = _coerce_numeric(item_meta.get("price"), default=0.0)
+            row["item_release_year"] = _coerce_numeric(item_meta.get("release_year"), default=0.0)
+            row["item_genre_count"] = _coerce_numeric(item_meta.get("genre_count"), default=0.0)
+            row["item_category_depth"] = _coerce_numeric(item_meta.get("category_depth"), default=0.0)
+            row["item_popularity"] = float(popularity.get(item_id, 0.0))
+            row["item_positive_rate"] = float(item_positive_rate.get(item_id, 0.0))
+            row["item_is_cold"] = float(item_id in split.cold_item_ids)
+            row["price_missing"] = float(pd.isna(item_meta.get("price")))
+            row["category_affinity"] = safe_affinity_count(history_categories, item_meta.get(dataset.context_col))
+            row["brand_affinity"] = safe_affinity_count(history_brands, item_meta.get("brand"))
+            row["same_item_history"] = float((user_history[ITEM_ID_COL] == item_id).sum()) if not user_history.empty else 0.0
+            row["price_distance_to_user_avg"] = abs(row["item_price"] - row["user_avg_history_price"])
+            row["history_positive_same_category"] = float(
+                (
+                    (history_categories.astype(str) == str(item_meta.get(dataset.context_col, "unknown")))
+                    & (user_history[LABEL_COL] == 1)
+                ).sum()
+            ) if not user_history.empty and dataset.context_col in item_meta.index else 0.0
+
+            for genre_col in genre_cols:
+                row[f"feat_{genre_col}"] = _coerce_numeric(item_meta.get(genre_col), default=0.0)
+            rows.append(row)
 
     return pd.DataFrame(rows).fillna(
         {
