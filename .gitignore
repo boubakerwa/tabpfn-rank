@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local experiment artifacts
+paper/figures/*.png
+paper/figures/*.pdf
+paper/results/*.csv
+paper/results/*.tsv
+paper/results/*.json
+paper/results/*.md
+
+# Local data
+data/
