@@ -13,6 +13,26 @@ import zipfile
 from pathlib import Path
 from typing import Iterable
 
+_DOTENV_LOADED = False
+
+
+def load_project_dotenv() -> None:
+    """Load a repo-local .env file once if python-dotenv is available."""
+
+    global _DOTENV_LOADED
+    if _DOTENV_LOADED:
+        return
+
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        _DOTENV_LOADED = True
+        return
+
+    repo_root = Path(__file__).resolve().parents[2]
+    load_dotenv(repo_root / ".env", override=False)
+    _DOTENV_LOADED = True
+
 
 def ensure_dir(path: str | Path) -> Path:
     """Create a directory if it does not already exist."""
@@ -93,7 +113,18 @@ def maybe_download_jsonl_gz_prefix(url: str, destination: str | Path, max_lines:
 def read_env_int(name: str, default: int | None = None) -> int | None:
     """Read an integer environment variable if available."""
 
+    load_project_dotenv()
     value = os.getenv(name)
     if value is None:
         return default
     return int(value)
+
+
+def read_env_str(name: str, default: str | None = None) -> str | None:
+    """Read a string environment variable if available."""
+
+    load_project_dotenv()
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return value

@@ -1,4 +1,5 @@
 from recpfn.rerank.pipeline import run_experiment
+from recpfn.models.tabpfn_pointwise import _resolve_tabpfn_version
 
 
 def test_pipeline_smoke_runs_on_synthetic_dataset(tmp_path):
@@ -34,3 +35,13 @@ def test_tabpfn_pipeline_smoke_runs_when_dependency_is_available(tmp_path):
     )
 
     assert set(results["status"]) == {"ok"}
+
+
+def test_tabpfn_version_parser_supports_v2_and_v25():
+    class DummyVersion:
+        V2 = "v2"
+        V2_5 = "v2.5"
+
+    assert _resolve_tabpfn_version(DummyVersion, "v2") == "v2"
+    assert _resolve_tabpfn_version(DummyVersion, "2") == "v2"
+    assert _resolve_tabpfn_version(DummyVersion, "v2.5") == "v2.5"
