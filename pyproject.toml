@@ -8,7 +8,32 @@ version = "0.1.0"
 description = "Paper-first experiments for small-data candidate reranking with TabPFN and tabular baselines."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "scikit-learn>=1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+]
+models = [
+  "xgboost>=2.1",
+  "catboost>=1.2",
+]
+tabpfn = [
+  "tabpfn>=2.0",
+]
+all = [
+  "pytest>=8.3",
+  "xgboost>=2.1",
+  "catboost>=1.2",
+  "tabpfn>=2.0",
+]
+
+[project.scripts]
+recpfn = "recpfn.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

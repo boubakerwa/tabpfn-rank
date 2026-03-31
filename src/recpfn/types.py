@@ -1,0 +1,50 @@
+"""Shared dataclasses and type aliases."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+
+@dataclass
+class DatasetBundle:
+    """Normalized dataset tables plus metadata needed by the pipeline."""
+
+    name: str
+    users: pd.DataFrame
+    items: pd.DataFrame
+    interactions: pd.DataFrame
+    user_feature_columns: list[str]
+    item_feature_columns: list[str]
+    timestamp_col: str = "timestamp"
+    label_col: str = "label"
+    event_col: str = "event"
+    context_col: str = "primary_category"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SplitBundle:
+    """Train/test decomposition for one evaluation regime."""
+
+    name: str
+    split_type: str
+    train_interactions: pd.DataFrame
+    train_queries: pd.DataFrame
+    test_queries: pd.DataFrame
+    cold_item_ids: set[Any] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RunArtifacts:
+    """Paths emitted by the experiment runner."""
+
+    output_dir: Path
+    predictions_paths: list[Path] = field(default_factory=list)
+    metrics_paths: list[Path] = field(default_factory=list)
+    benchmark_table_path: Path | None = None
+    summary_csv_path: Path | None = None
