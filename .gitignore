@@ -8,6 +8,7 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv311/
 venv/
 env/
 
@@ -25,12 +26,12 @@ dist/
 .vscode/
 
 # Local experiment artifacts
-paper/figures/*.png
-paper/figures/*.pdf
-paper/results/*.csv
-paper/results/*.tsv
-paper/results/*.json
-paper/results/*.md
+paper/figures/**
+!paper/figures/.gitkeep
+paper/results/**
+!paper/results/.gitkeep
+paper/results_*/
 
 # Local data
-data/
+/data/
+catboost_info/

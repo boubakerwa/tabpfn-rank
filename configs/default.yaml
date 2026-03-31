@@ -1,0 +1,14 @@
+dataset: movielens_100k
+split: warm
+protocols:
+  - global_popularity
+  - context_popularity
+pointwise_models:
+  - popularity
+  - recent_popularity
+  - xgboost
+  - catboost
+  - tabpfn
+pairwise_models: []
+k: 20
+seed: 0

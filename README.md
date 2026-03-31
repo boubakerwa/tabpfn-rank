@@ -138,6 +138,48 @@ paper/            Figures, result tables, and manuscript assets
 tests/            Sanity checks and regression tests
 ```
 
+## Current Implementation
+
+The repo now includes the MVP2 first-sweep benchmark spine:
+
+- canonical dataset loaders for `MovieLens 100K`, `Amazon Reviews 2023 / Baby_Products`, and a tiny synthetic test dataset
+- deterministic `warm` and `item_cold` split builders
+- `global_popularity` and `context_popularity` candidate protocols with oracle positive inclusion
+- compact tabular feature builder with user history, item metadata, and user-item affinity features
+- pointwise and pairwise training flows
+- optional model adapters for `XGBoost`, `CatBoost`, and `TabPFN`
+- benchmark reporting to per-query CSVs, per-run JSON metrics, summary CSV, and markdown benchmark tables
+
+## Quickstart
+
+Create a Python 3.10+ environment, then install the package:
+
+```bash
+pip install -e ".[dev]"
+pip install xgboost catboost
+```
+
+Run a first MovieLens benchmark sweep:
+
+```bash
+python -m recpfn.cli \
+  --dataset movielens_100k \
+  --split warm \
+  --protocols global_popularity context_popularity \
+  --pointwise-models popularity xgboost catboost \
+  --max-train-queries 200 \
+  --max-test-queries 100
+```
+
+Outputs are written under `paper/results/<dataset>/<split>/`.
+
+For the Amazon loader, you can cap raw ingestion during development:
+
+```bash
+export RECPFN_AMAZON_MAX_REVIEWS=50000
+export RECPFN_AMAZON_MAX_META=100000
+```
+
 ## Development Principle
 
 This repo should stay brutally honest.
