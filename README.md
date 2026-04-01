@@ -12,6 +12,37 @@ Phase 1 exists to answer a single question:
 
 If the answer is no, we stop early or keep only the benchmark artifacts.
 
+## Interim Findings
+
+From the current Phase 1 decision sweep, `61/64` benchmark units have completed.
+
+- Interim decision: **drill further**, but reframe the story around **pointwise TabPFN**, not pairwise TabPFN.
+- Strongest positive signal: pointwise TabPFN is competitive or best in several context-aware and cold-start settings.
+- Strongest negative signal: pairwise TabPFN is mixed and often much slower than pointwise TabPFN.
+- Missing units: only the narrow `amazon_baby_products / item_cold / context_popularity / pairwise` block remains incomplete.
+
+Concrete completed results so far:
+
+- `MovieLens item_cold / context_popularity`: pointwise TabPFN `NDCG@10 = 0.9087` vs best tree baseline `0.8755`
+- `Amazon item_cold / context_popularity`: pointwise TabPFN `0.9779` vs best tree baseline `0.6346`
+- `Amazon warm / context_popularity`: pointwise TabPFN `0.6143` vs best tree baseline `0.4646`
+- `MovieLens warm / global_popularity`: pairwise TabPFN `0.8412` vs best tree baseline `0.7956`
+
+Important caveats:
+
+- Pairwise TabPFN beats pointwise TabPFN in only `2/7` completed matched settings so far.
+- Pairwise TabPFN is roughly `17x` to `29x` slower than pointwise TabPFN on matched settings.
+- `Amazon / global_popularity` is partly saturated and should not be the main decision driver.
+
+## Immediate Next Step
+
+The next decision-stage sweep is deliberately narrow:
+
+1. Freeze the current Phase 1 evidence snapshot.
+2. Run the focused `MovieLens` low-data ladder at `10%`, `20%`, `50%`, and `100%`.
+3. Compare `xgboost`, `catboost`, and `tabpfn` in both pointwise and pairwise modes on `warm` and `item_cold`.
+4. Only promote MVP 3 if the low-data signal still supports a **pointwise TabPFN** story.
+
 ## Core Research Question
 
 Can TabPFN, used as a pointwise or pairwise reranker, beat strong tabular baselines on:
@@ -172,6 +203,15 @@ python -m recpfn.cli \
 ```
 
 Outputs are written under `paper/results/<dataset>/<split>/`.
+
+To summarize an already completed Phase 1 sweep without rerunning it:
+
+```bash
+python -m recpfn.phase1_decision \
+  --run-output-dir paper/results_phase1_decision_runs_final \
+  --output-dir paper/phase1_decision \
+  --reuse-existing
+```
 
 For the Amazon loader, you can cap raw ingestion during development:
 

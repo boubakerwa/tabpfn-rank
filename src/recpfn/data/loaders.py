@@ -46,7 +46,7 @@ def load_dataset(name: str, cache_dir: str | Path = "data", seed: int = 0) -> Da
 
     if normalized in {"movielens", "movielens_100k", "ml100k", "ml_100k"}:
         return _load_movielens_100k(cache_path)
-    if normalized in {"amazon_baby", "amazon_reviews_2023_baby", "baby_products"}:
+    if normalized in {"amazon_baby", "amazon_reviews_2023_baby", "baby_products", "amazon_baby_products"}:
         return _load_amazon_baby(cache_path)
     if normalized in {"synthetic", "tiny"}:
         return _load_synthetic(seed=seed)
@@ -194,7 +194,10 @@ def _load_amazon_baby(cache_dir: Path) -> DatasetBundle:
                 "category_depth": len(flat_categories),
             }
         )
-    items = pd.DataFrame(items).drop_duplicates(subset=[ITEM_ID_COL])
+    items = pd.DataFrame(
+        items,
+        columns=[ITEM_ID_COL, "title", "brand", "price", "primary_category", "category_depth"],
+    ).drop_duplicates(subset=[ITEM_ID_COL])
     items["price"] = pd.to_numeric(items["price"], errors="coerce")
     items["brand"] = items["brand"].fillna("unknown").astype(str)
     items["primary_category"] = items["primary_category"].fillna("unknown").astype(str)
