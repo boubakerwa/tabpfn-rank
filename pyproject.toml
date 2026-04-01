@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "matplotlib>=3.9",
   "pytest>=8.3",
 ]
 models = [
@@ -27,6 +28,7 @@ tabpfn = [
   "tabpfn>=2.0",
 ]
 all = [
+  "matplotlib>=3.9",
   "pytest>=8.3",
   "xgboost>=2.1",
   "catboost>=1.2",
@@ -35,6 +37,8 @@ all = [
 
 [project.scripts]
 recpfn = "recpfn.cli:main"
+recpfn-phase1-decision = "recpfn.phase1_decision:main"
+recpfn-unit-runner = "recpfn.unit_runner:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

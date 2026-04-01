@@ -48,3 +48,16 @@ class RunArtifacts:
     metrics_paths: list[Path] = field(default_factory=list)
     benchmark_table_path: Path | None = None
     summary_csv_path: Path | None = None
+
+
+@dataclass
+class Phase1DecisionArtifacts:
+    """Paths emitted by the phase-one decision sweep."""
+
+    output_dir: Path
+    run_output_dir: Path
+    merged_results_path: Path | None = None
+    benchmark_table_path: Path | None = None
+    decision_memo_path: Path | None = None
+    tie_break_results_path: Path | None = None
+    next_steps_plan_path: Path | None = None

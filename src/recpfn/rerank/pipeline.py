@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import time
 from pathlib import Path
 
@@ -22,8 +23,8 @@ from recpfn.models.base import (
     score_pairwise_candidates,
 )
 from recpfn.rerank.candidate_sets import build_candidates
-from recpfn.types import RunArtifacts
-from recpfn.utils import ensure_dir
+from recpfn.types import RunArtifacts, SplitBundle
+from recpfn.utils import ensure_dir, read_env_str
 
 
 def run_experiment(
@@ -43,22 +44,28 @@ def run_experiment(
 
     dataset = load_dataset(dataset_name, cache_dir=cache_dir, seed=seed)
     split = build_splits(dataset, split_type=split_type, seed=seed)
+    split = limit_split_queries(
+        split,
+        max_train_queries=max_train_queries,
+        max_test_queries=max_test_queries,
+    )
     artifact_dir = ensure_dir(Path(output_dir) / dataset.name / split.split_type)
     result_rows = []
     artifacts = RunArtifacts(output_dir=artifact_dir)
+    run_metadata = _build_run_metadata(
+        seed=seed,
+        k=k,
+        max_train_queries=max_train_queries,
+        max_test_queries=max_test_queries,
+    )
 
     for protocol in protocols:
         candidates = build_candidates(dataset, split, protocol=protocol, k=k, seed=seed)
-        if max_train_queries is not None:
-            train_query_ids = candidates[candidates["split"] == "train"]["query_id"].drop_duplicates().head(max_train_queries)
-            candidates = candidates[
-                (candidates["split"] != "train") | (candidates["query_id"].isin(train_query_ids))
-            ]
-        if max_test_queries is not None:
-            test_query_ids = candidates[candidates["split"] == "test"]["query_id"].drop_duplicates().head(max_test_queries)
-            candidates = candidates[
-                (candidates["split"] != "test") | (candidates["query_id"].isin(test_query_ids))
-            ]
+        candidates = limit_candidate_queries(
+            candidates,
+            max_train_queries=max_train_queries,
+            max_test_queries=max_test_queries,
+        )
 
         features = build_features(dataset, candidates, split)
         train_df = features[features["split"] == "train"].copy()
@@ -73,7 +80,15 @@ def run_experiment(
                 scored["score"] = predict_scores(model, scored, feature_cols)
             except Exception as exc:
                 result_rows.append(
-                    _failure_row(dataset.name, split.split_type, protocol, model_name, "pointwise", exc)
+                    _failure_row(
+                        dataset.name,
+                        split.split_type,
+                        protocol,
+                        model_name,
+                        "pointwise",
+                        exc,
+                        run_metadata=run_metadata,
+                    )
                 )
                 continue
             runtime = time.perf_counter() - start
@@ -88,6 +103,7 @@ def run_experiment(
                     "model": model_name,
                     "mode": "pointwise",
                     "status": "ok",
+                    **run_metadata,
                 }
             )
             result_rows.append(metrics)
@@ -114,6 +130,7 @@ def run_experiment(
                             model_name,
                             "pairwise",
                             RuntimeError("No pairwise training rows were generated."),
+                            run_metadata=run_metadata,
                         )
                     )
                     continue
@@ -123,7 +140,15 @@ def run_experiment(
                     scored = score_pairwise_candidates(model, test_df, feature_cols)
                 except Exception as exc:
                     result_rows.append(
-                        _failure_row(dataset.name, split.split_type, protocol, model_name, "pairwise", exc)
+                        _failure_row(
+                            dataset.name,
+                            split.split_type,
+                            protocol,
+                            model_name,
+                            "pairwise",
+                            exc,
+                            run_metadata=run_metadata,
+                        )
                     )
                     continue
                 runtime = time.perf_counter() - start
@@ -138,6 +163,7 @@ def run_experiment(
                         "model": model_name,
                         "mode": "pairwise",
                         "status": "ok",
+                        **run_metadata,
                     }
                 )
                 result_rows.append(metrics)
@@ -158,8 +184,73 @@ def run_experiment(
     return results, artifacts
 
 
-def _failure_row(dataset: str, split_type: str, protocol: str, model_name: str, mode: str, exc: Exception) -> dict:
+def limit_candidate_queries(
+    candidates: pd.DataFrame,
+    max_train_queries: int | None = None,
+    max_test_queries: int | None = None,
+) -> pd.DataFrame:
+    """Limit train/test candidate rows to the first N queries per split."""
+
+    limited = candidates.copy()
+    if max_train_queries is not None:
+        train_query_ids = limited[limited["split"] == "train"]["query_id"].drop_duplicates().head(max_train_queries)
+        limited = limited[(limited["split"] != "train") | (limited["query_id"].isin(train_query_ids))]
+    if max_test_queries is not None:
+        test_query_ids = limited[limited["split"] == "test"]["query_id"].drop_duplicates().head(max_test_queries)
+        limited = limited[(limited["split"] != "test") | (limited["query_id"].isin(test_query_ids))]
+    return limited
+
+
+def limit_split_queries(
+    split: SplitBundle,
+    max_train_queries: int | None = None,
+    max_test_queries: int | None = None,
+) -> SplitBundle:
+    """Limit split query frames before candidate generation."""
+
+    limited_train_queries = split.train_queries.copy()
+    limited_test_queries = split.test_queries.copy()
+    if max_train_queries is not None:
+        limited_train_queries = limited_train_queries.head(max_train_queries).copy()
+    if max_test_queries is not None:
+        limited_test_queries = limited_test_queries.head(max_test_queries).copy()
+    return replace(
+        split,
+        train_queries=limited_train_queries,
+        test_queries=limited_test_queries,
+        metadata={
+            **split.metadata,
+            "n_train_queries": len(limited_train_queries),
+            "n_test_queries": len(limited_test_queries),
+        },
+    )
+
+
+def _build_run_metadata(
+    seed: int,
+    k: int,
+    max_train_queries: int | None,
+    max_test_queries: int | None,
+) -> dict[str, object]:
     return {
+        "tabpfn_version": read_env_str("RECPFN_TABPFN_VERSION", "v2"),
+        "k": int(k),
+        "max_train_queries": max_train_queries,
+        "max_test_queries": max_test_queries,
+        "seed": int(seed),
+    }
+
+
+def _failure_row(
+    dataset: str,
+    split_type: str,
+    protocol: str,
+    model_name: str,
+    mode: str,
+    exc: Exception,
+    run_metadata: dict[str, object] | None = None,
+) -> dict:
+    row = {
         "dataset": dataset,
         "split_type": split_type,
         "protocol": protocol,
@@ -174,3 +265,6 @@ def _failure_row(dataset: str, split_type: str, protocol: str, model_name: str, 
         "mrr": float("nan"),
         "hitrate@10": float("nan"),
     }
+    if run_metadata:
+        row.update(run_metadata)
+    return row

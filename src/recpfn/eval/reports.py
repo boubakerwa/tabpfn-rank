@@ -25,13 +25,32 @@ def save_metrics(metrics: dict, path: str | Path) -> Path:
     return path
 
 
-def save_benchmark_table(results: pd.DataFrame, path: str | Path) -> Path:
+def save_benchmark_table(
+    results: pd.DataFrame,
+    path: str | Path,
+    columns: list[str] | None = None,
+    sort_by: list[str] | None = None,
+) -> Path:
     path = Path(path)
     ensure_dir(path.parent)
-    columns = ["dataset", "split_type", "protocol", "mode", "model", "ndcg@10", "recall@10", "mrr", "hitrate@10", "runtime_seconds"]
-    table = results[results["status"] == "ok"][columns].sort_values(
-        ["dataset", "split_type", "protocol", "mode", "model"]
-    )
+    selected_columns = columns or [
+        "dataset",
+        "split_type",
+        "protocol",
+        "mode",
+        "model",
+        "ndcg@10",
+        "recall@10",
+        "mrr",
+        "hitrate@10",
+        "runtime_seconds",
+    ]
+    selected_columns = [column for column in selected_columns if column in results.columns]
+    selected_sort = sort_by or ["dataset", "split_type", "protocol", "mode", "model"]
+    selected_sort = [column for column in selected_sort if column in results.columns]
+    table = results[results["status"] == "ok"][selected_columns]
+    if selected_sort:
+        table = table.sort_values(selected_sort)
     with path.open("w", encoding="utf-8") as handle:
         handle.write(_to_markdown(table))
         handle.write("\n")
