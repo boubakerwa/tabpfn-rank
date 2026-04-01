@@ -243,6 +243,7 @@ def run_phase1_decision(
     artifacts.next_steps_plan_path = write_next_steps_plan(
         decision,
         decision_root / "next_steps.md",
+        low_data_ran=bool((merged.get("phase") == "tie_break").any()) if not merged.empty and "phase" in merged.columns else False,
     )
     return merged, artifacts, decision
 
@@ -309,6 +310,7 @@ def summarize_existing_phase1_runs(
         decision,
         decision_root / "next_steps.md",
         snapshot=snapshot,
+        low_data_ran=bool((results.get("phase") == "tie_break").any()) if not results.empty and "phase" in results.columns else False,
     )
     return results, artifacts, decision
 
@@ -328,6 +330,7 @@ def run_movie_lens_tie_break(
     for split_type in CANONICAL_SPLITS:
         for train_fraction in TIE_BREAK_FRACTIONS:
             max_train_queries = max(1, math.ceil(canonical_max_train_queries * train_fraction))
+            fraction_dir = Path(output_dir) / f"train_{int(train_fraction * 100):03d}"
             pointwise_results = _run_unit_matrix(
                 dataset_name=PRIMARY_DATASET,
                 split_type=split_type,
@@ -335,7 +338,7 @@ def run_movie_lens_tie_break(
                 models=["xgboost", "catboost", "tabpfn"],
                 mode="pointwise",
                 cache_dir=cache_dir,
-                output_dir=Path(output_dir) / "pointwise",
+                output_dir=fraction_dir / "pointwise",
                 seed=seed,
                 k=k,
                 max_train_queries=max_train_queries,
@@ -349,7 +352,7 @@ def run_movie_lens_tie_break(
                 models=["tabpfn", "xgboost", "catboost"],
                 mode="pairwise",
                 cache_dir=cache_dir,
-                output_dir=Path(output_dir) / "pairwise",
+                output_dir=fraction_dir / "pairwise",
                 seed=seed,
                 k=k,
                 max_train_queries=max_train_queries,
@@ -495,8 +498,10 @@ def write_decision_memo(
     ensure_dir(path.parent)
     ok = results[results["status"] == "ok"].copy()
     canonical = ok[ok["phase"] == "canonical"] if "phase" in ok.columns else ok
+    tie_break = ok[ok["phase"] == "tie_break"] if "phase" in ok.columns else pd.DataFrame()
     movielens_best = _best_rows(canonical, PRIMARY_DATASET)
     amazon_best = _best_rows(canonical, SECONDARY_DATASET)
+    low_data_best = _best_rows(tie_break, PRIMARY_DATASET) if not tie_break.empty else {"best_tree": None, "best_tabpfn": None}
     amazon_review_cap = read_env_int("RECPFN_AMAZON_MAX_REVIEWS")
     amazon_meta_cap = read_env_int("RECPFN_AMAZON_MAX_META")
     provisional = amazon_review_cap is not None or amazon_meta_cap is not None
@@ -552,6 +557,22 @@ def write_decision_memo(
             f"- MovieLens best TabPFN row: {_format_best_row(movielens_best.get('best_tabpfn'))}",
             f"- Amazon best tree row: {_format_best_row(amazon_best.get('best_tree'))}",
             f"- Amazon best TabPFN row: {_format_best_row(amazon_best.get('best_tabpfn'))}",
+        ]
+    )
+    if not tie_break.empty:
+        lines.extend(
+            [
+                "",
+                "## Low-Data Ladder Highlights",
+                "",
+                f"- MovieLens low-data best tree row: {_format_best_row(low_data_best.get('best_tree'))}",
+                f"- MovieLens low-data best TabPFN row: {_format_best_row(low_data_best.get('best_tabpfn'))}",
+            ]
+        )
+        lines.extend(["", "## Low-Data Scorecard", ""])
+        lines.extend(_format_low_data_scorecard(tie_break))
+    lines.extend(
+        [
             "",
             "## Pairwise TabPFN Checks",
             "",
@@ -596,6 +617,7 @@ def write_next_steps_plan(
     decision: dict[str, object],
     path: str | Path,
     snapshot: dict[str, object] | None = None,
+    low_data_ran: bool = False,
 ) -> Path:
     """Write the recommended next steps that follow from the current decision."""
 
@@ -616,7 +638,18 @@ def write_next_steps_plan(
             ]
         )
 
-    if outcome == "drill further":
+    if outcome == "drill further" and low_data_ran:
+        lines.extend(
+            [
+                "## Recommended Plan",
+                "",
+                "1. Freeze Phase 1 and treat pointwise TabPFN as the primary positive story.",
+                "2. Keep pairwise TabPFN as an ablation unless a later focused experiment changes the picture.",
+                "3. Start MVP 3 around small-data and item-cold pointwise reranking, not a general pairwise method claim.",
+                "4. Turn the current evidence into one tight writeup, one benchmark table, and one concise figure set.",
+            ]
+        )
+    elif outcome == "drill further":
         lines.extend(
             [
                 "## Recommended Plan",
@@ -972,6 +1005,44 @@ def _single_run_value(frame: pd.DataFrame, column: str, default: object) -> obje
     if not values:
         return default
     return values[0]
+
+
+def _format_low_data_scorecard(tie_break: pd.DataFrame) -> list[str]:
+    rows = []
+    subset = tie_break[
+        (tie_break["dataset"] == PRIMARY_DATASET)
+        & (tie_break["protocol"] == "global_popularity")
+        & (tie_break["status"] == "ok")
+    ].copy()
+    if subset.empty:
+        return ["- No low-data rows were available."]
+
+    for split_type in CANONICAL_SPLITS:
+        split_rows = subset[subset["split_type"] == split_type]
+        if split_rows.empty:
+            continue
+        for train_fraction in TIE_BREAK_FRACTIONS:
+            group = split_rows[split_rows["train_fraction"] == train_fraction]
+            if group.empty:
+                continue
+            pointwise = group[(group["model"] == "tabpfn") & (group["mode"] == "pointwise")]
+            pairwise = group[(group["model"] == "tabpfn") & (group["mode"] == "pairwise")]
+            tree_rows = group[group["model"].isin(TREE_MODELS)]
+            if pointwise.empty or pairwise.empty or tree_rows.empty:
+                continue
+            pointwise_row = pointwise.iloc[0]
+            pairwise_row = pairwise.iloc[0]
+            tree_row = tree_rows.sort_values(["ndcg@10", "recall@10", "mrr"], ascending=False).iloc[0]
+            best_row = group.sort_values(["ndcg@10", "recall@10", "mrr"], ascending=False).iloc[0]
+            rows.append(
+                "- "
+                f"{split_type} / {int(train_fraction * 100)}%: "
+                f"best={best_row['model']} {best_row['mode']} ({best_row['ndcg@10']:.4f}), "
+                f"TabPFN pointwise={pointwise_row['ndcg@10']:.4f}, "
+                f"TabPFN pairwise={pairwise_row['ndcg@10']:.4f}, "
+                f"best tree={tree_row['model']} {tree_row['mode']} ({tree_row['ndcg@10']:.4f})"
+            )
+    return rows or ["- No low-data rows were available."]
 
 
 def _unit_label(dataset: str, split_type: str, protocol: str, mode: str, model: str) -> str:

@@ -38,6 +38,7 @@ all = [
 [project.scripts]
 recpfn = "recpfn.cli:main"
 recpfn-phase1-decision = "recpfn.phase1_decision:main"
+recpfn-phase1-low-data = "recpfn.phase1_low_data:main"
 recpfn-unit-runner = "recpfn.unit_runner:main"
 
 [tool.setuptools.packages.find]

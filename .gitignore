@@ -30,6 +30,7 @@ dist/
 # Local experiment artifacts
 paper/figures/**
 !paper/figures/.gitkeep
+paper/phase1_*/
 paper/results/**
 !paper/results/.gitkeep
 paper/results_*/

@@ -29,6 +29,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Root directory containing per-unit results.csv files.",
     )
     parser.add_argument(
+        "--summary-csv",
+        default=None,
+        help="Optional merged summary CSV to plot instead of scanning a results root.",
+    )
+    parser.add_argument(
         "--output-dir",
         default="paper/figures/phase1_final",
         help="Directory where plots will be written.",
@@ -44,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    results = load_results(args.results_root)
+    results = load_results(args.results_root, summary_csv=args.summary_csv)
     ok = results[results["status"] == "ok"].copy()
     if ok.empty:
         raise SystemExit("No successful result rows were found.")
@@ -68,7 +73,10 @@ def main() -> None:
         print(path)
 
 
-def load_results(results_root: str | Path) -> pd.DataFrame:
+def load_results(results_root: str | Path, summary_csv: str | Path | None = None) -> pd.DataFrame:
+    if summary_csv is not None:
+        return pd.read_csv(summary_csv)
+
     root = Path(results_root)
     paths = sorted(root.glob("**/results.csv"))
     if not paths:

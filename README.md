@@ -12,36 +12,30 @@ Phase 1 exists to answer a single question:
 
 If the answer is no, we stop early or keep only the benchmark artifacts.
 
-## Interim Findings
+## Phase 1 Findings
 
-From the current Phase 1 decision sweep, `61/64` benchmark units have completed.
+Phase 1 now has a clear decision: **drill further**, but center the next phase on **pointwise TabPFN**, not pairwise TabPFN.
 
-- Interim decision: **drill further**, but reframe the story around **pointwise TabPFN**, not pairwise TabPFN.
-- Strongest positive signal: pointwise TabPFN is competitive or best in several context-aware and cold-start settings.
-- Strongest negative signal: pairwise TabPFN is mixed and often much slower than pointwise TabPFN.
-- Missing units: only the narrow `amazon_baby_products / item_cold / context_popularity / pairwise` block remains incomplete.
-
-Concrete completed results so far:
-
-- `MovieLens item_cold / context_popularity`: pointwise TabPFN `NDCG@10 = 0.9087` vs best tree baseline `0.8755`
-- `Amazon item_cold / context_popularity`: pointwise TabPFN `0.9779` vs best tree baseline `0.6346`
-- `Amazon warm / context_popularity`: pointwise TabPFN `0.6143` vs best tree baseline `0.4646`
-- `MovieLens warm / global_popularity`: pairwise TabPFN `0.8412` vs best tree baseline `0.7956`
+- The strongest positive signal is the low-data warm-start ladder on `MovieLens`. Pointwise TabPFN was best at `10%`, `20%`, and `50%` train scale with `NDCG@10 = 0.8362`, `0.8306`, and `0.8315`.
+- The strongest cold-start pointwise signal remains `MovieLens item_cold / context_popularity`, where pointwise TabPFN reached `0.9087` vs the best tree baseline at `0.8755`.
+- The Amazon context-aware signal is still positive but secondary: `Amazon warm / context_popularity` pointwise TabPFN reached `0.6143` vs the best tree at `0.4646`.
+- Pairwise TabPFN is not the lead story. In the low-data ladder it only became best at `MovieLens warm / 100%` (`0.8412`), and it stayed expensive throughout.
+- On `MovieLens item_cold / global_popularity`, pairwise TabPFN was strong at full data (`0.9742`) but still slightly behind the best tree (`0.9769`).
+- The missing canonical block remains the narrow `amazon_baby_products / item_cold / context_popularity / pairwise` corner, and it is non-blocking for the Phase 1 decision.
 
 Important caveats:
 
-- Pairwise TabPFN beats pointwise TabPFN in only `2/7` completed matched settings so far.
-- Pairwise TabPFN is roughly `17x` to `29x` slower than pointwise TabPFN on matched settings.
-- `Amazon / global_popularity` is partly saturated and should not be the main decision driver.
+- In the low-data ladder, pairwise TabPFN runtimes ranged from about `141s` to `407s`, versus roughly `6s` to `24s` for pointwise TabPFN.
+- `Amazon / global_popularity` is partly saturated and should not drive the main paper claim.
+- The current Amazon result is still provisional because the local run used a capped review slice.
 
 ## Immediate Next Step
 
-The next decision-stage sweep is deliberately narrow:
+The next step is no longer more Phase 1 benchmarking. It is to freeze Phase 1 and start MVP 3 with the right scope:
 
-1. Freeze the current Phase 1 evidence snapshot.
-2. Run the focused `MovieLens` low-data ladder at `10%`, `20%`, `50%`, and `100%`.
-3. Compare `xgboost`, `catboost`, and `tabpfn` in both pointwise and pairwise modes on `warm` and `item_cold`.
-4. Only promote MVP 3 if the low-data signal still supports a **pointwise TabPFN** story.
+1. Treat **pointwise TabPFN for small-data and cold-start reranking** as the main method story.
+2. Keep pairwise TabPFN as an ablation unless later targeted evidence changes that.
+3. Turn the current benchmark table, memo, and figure set into one concise writeup.
 
 ## Core Research Question
 
