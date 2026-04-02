@@ -23,8 +23,10 @@ class TabPFNNativePointwiseRanker(BasePointwiseRanker):
     def __init__(self) -> None:
         super().__init__()
         self.categorical_cols_: list[str] = []
+        self.feature_columns_: list[str] = []
 
     def fit(self, frame: pd.DataFrame, feature_cols: list[str], target_col: str = LABEL_COL) -> "TabPFNNativePointwiseRanker":
+        self.feature_columns_ = list(feature_cols)
         x, categorical_cols = _prepare_tabpfn_native_frame(frame[feature_cols])
         categorical_indices = [x.columns.get_loc(column) for column in categorical_cols]
         y = frame[target_col].astype(int).to_numpy()
@@ -36,6 +38,10 @@ class TabPFNNativePointwiseRanker(BasePointwiseRanker):
     def predict_proba(self, frame: pd.DataFrame, feature_cols: list[str]):
         if self.model is None:
             raise RuntimeError("Model must be fit before prediction.")
+        if list(feature_cols) != self.feature_columns_:
+            raise ValueError(
+                "tabpfn_native requires the prediction feature columns to match the training feature columns exactly."
+            )
         x, _ = _prepare_tabpfn_native_frame(frame[feature_cols], categorical_cols=self.categorical_cols_)
         return self.model.predict_proba(x)[:, 1]
 
@@ -48,6 +54,12 @@ def _prepare_tabpfn_native_frame(
     inferred_categorical_cols = categorical_cols or [
         column for column in prepared.columns if _is_categorical_series(prepared[column])
     ]
+    missing_categorical = [column for column in inferred_categorical_cols if column not in prepared.columns]
+    if missing_categorical:
+        raise ValueError(
+            "tabpfn_native is missing categorical columns at predict time: "
+            + ", ".join(sorted(missing_categorical))
+        )
     for column in prepared.columns:
         if column in inferred_categorical_cols:
             prepared[column] = prepared[column].astype("string")

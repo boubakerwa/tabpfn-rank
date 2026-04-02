@@ -39,6 +39,8 @@ all = [
 recpfn = "recpfn.cli:main"
 recpfn-phase1-decision = "recpfn.phase1_decision:main"
 recpfn-phase1-low-data = "recpfn.phase1_low_data:main"
+recpfn-phase2-pointwise-run = "recpfn.phase2_pointwise_run:main"
+recpfn-phase2-pointwise-report = "recpfn.phase2_pointwise_report:main"
 recpfn-unit-runner = "recpfn.unit_runner:main"
 
 [tool.setuptools.packages.find]
