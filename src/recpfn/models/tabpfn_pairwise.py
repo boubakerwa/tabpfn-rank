@@ -1,5 +1,6 @@
-"""Compatibility import for the pairwise TabPFN wrapper."""
+"""Compatibility imports for the pairwise TabPFN wrappers."""
 
-from recpfn.models.tabpfn_pointwise import TabPFNPointwiseRanker
+from recpfn.models.tabpfn_pointwise import TabPFNNativePointwiseRanker, TabPFNPointwiseRanker
 
 TabPFNPairwiseRanker = TabPFNPointwiseRanker
+TabPFNNativePairwiseRanker = TabPFNNativePointwiseRanker

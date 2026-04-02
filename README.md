@@ -29,6 +29,17 @@ Important caveats:
 - `Amazon / global_popularity` is partly saturated and should not drive the main paper claim.
 - The current Amazon result is still provisional because the local run used a capped review slice.
 
+## Adapter Comparison
+
+We also added a parallel experimental adapter, `tabpfn_native`, that keeps categorical columns in mixed-type tabular form instead of routing TabPFN through the shared one-hot path.
+
+- On `MovieLens 100K` pointwise reranking, `tabpfn_native` was strongest on the `item_cold / global_popularity` ladder: it beat the existing one-hot TabPFN path at `10%`, `20%`, `50%`, and `100%` train scale, with `NDCG@10` gains of `+0.0417`, `+0.0314`, `+0.0044`, and `+0.0235`.
+- It was also faster in every one of those item-cold runs.
+- The effect is regime-dependent, not universal: the native path lost on the `MovieLens` `context_popularity` pointwise checks and on the initial pairwise comparison.
+- A small capped Amazon pointwise check (`25/25` queries) was also mixed: `tabpfn_native` won on `warm / context_popularity` (`0.7507` vs `0.7102`) and was dramatically faster, but the original one-hot path won on `item_cold / context_popularity` (`0.7903` vs `0.7045`).
+
+Current interpretation: **TabPFN feature representation is itself an important experimental variable**, and native categorical handling looks most promising for **pointwise cold-start reranking**, not for pairwise ranking.
+
 ## Immediate Next Step
 
 The next step is no longer more Phase 1 benchmarking. It is to freeze Phase 1 and start MVP 3 with the right scope:
@@ -173,6 +184,7 @@ The repo now includes the MVP2 first-sweep benchmark spine:
 - compact tabular feature builder with user history, item metadata, and user-item affinity features
 - pointwise and pairwise training flows
 - optional model adapters for `XGBoost`, `CatBoost`, and `TabPFN`
+- two TabPFN adapter paths for comparison: the existing one-hot path (`tabpfn`) and an experimental native-categorical path (`tabpfn_native`)
 - benchmark reporting to per-query CSVs, per-run JSON metrics, summary CSV, and markdown benchmark tables
 
 ## Quickstart

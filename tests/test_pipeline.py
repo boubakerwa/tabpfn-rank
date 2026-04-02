@@ -1,5 +1,7 @@
+import pandas as pd
+
 from recpfn.rerank.pipeline import run_experiment
-from recpfn.models.tabpfn_pointwise import _resolve_tabpfn_version
+from recpfn.models.tabpfn_pointwise import _prepare_tabpfn_native_frame, _resolve_tabpfn_version
 
 
 def test_pipeline_smoke_runs_on_synthetic_dataset(tmp_path):
@@ -35,6 +37,43 @@ def test_tabpfn_pipeline_smoke_runs_when_dependency_is_available(tmp_path):
     )
 
     assert set(results["status"]) == {"ok"}
+
+
+def test_tabpfn_native_pipeline_smoke_runs_when_dependency_is_available(tmp_path):
+    pytest = __import__("pytest")
+    pytest.importorskip("tabpfn")
+
+    results, _ = run_experiment(
+        dataset_name="synthetic",
+        split_type="warm",
+        protocols=["global_popularity"],
+        pointwise_models=["tabpfn_native"],
+        pairwise_models=[],
+        output_dir=tmp_path,
+        k=4,
+        seed=0,
+    )
+
+    assert set(results["status"]) == {"ok"}
+
+
+def test_tabpfn_native_frame_preserves_categorical_columns():
+    frame = pd.DataFrame(
+        {
+            "user_gender": ["M", "F", None],
+            "item_brand": ["acme", "globex", "acme"],
+            "item_price": [19.5, 10.0, 7.0],
+            "same_item_history": [1, 0, 2],
+        }
+    )
+
+    prepared, categorical_cols = _prepare_tabpfn_native_frame(frame)
+
+    assert categorical_cols == ["user_gender", "item_brand"]
+    assert str(prepared["user_gender"].dtype) == "string"
+    assert str(prepared["item_brand"].dtype) == "string"
+    assert pd.api.types.is_numeric_dtype(prepared["item_price"])
+    assert pd.api.types.is_numeric_dtype(prepared["same_item_history"])
 
 
 def test_tabpfn_version_parser_supports_v2_and_v25():

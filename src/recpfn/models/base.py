@@ -292,4 +292,8 @@ def _build_ranker(model_name: str):
         from recpfn.models.tabpfn_pointwise import TabPFNPointwiseRanker
 
         return TabPFNPointwiseRanker()
+    if normalized == "tabpfn_native":
+        from recpfn.models.tabpfn_pointwise import TabPFNNativePointwiseRanker
+
+        return TabPFNNativePointwiseRanker()
     raise ValueError(f"Unsupported model '{model_name}'.")
