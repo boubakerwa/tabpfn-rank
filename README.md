@@ -1,6 +1,41 @@
-# TabPFN-Rank
+<h1 align="center">TabPFN-Rank</h1>
 
-Paper-first project for testing whether TabPFN-style inference can improve candidate reranking on small-data, metadata-heavy recommendation tasks.
+<p align="center">
+  <strong>Small-data candidate reranking with TabPFN and strong tabular baselines.</strong>
+</p>
+
+<p align="center">
+  Paper-first benchmark and method project for testing whether TabPFN-style inference can improve metadata-heavy recommendation reranking.
+</p>
+
+<p align="center">
+  <a href="https://github.com/boubakerwa/tabpfn-rank"><img alt="repo" src="https://img.shields.io/badge/repo-tabpfn--rank-111827"></a>
+  <img alt="phase" src="https://img.shields.io/badge/phase-1%20complete-0f766e">
+  <img alt="decision" src="https://img.shields.io/badge/decision-drill%20further-2563eb">
+  <img alt="focus" src="https://img.shields.io/badge/focus-pointwise%20TabPFN-7c3aed">
+  <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-0ea5e9">
+  <img alt="datasets" src="https://img.shields.io/badge/datasets-MovieLens%20%7C%20Amazon-f59e0b">
+</p>
+
+<p align="center">
+  <a href="#research-snapshot">Snapshot</a> •
+  <a href="#phase-1-findings">Findings</a> •
+  <a href="#quickstart">Quickstart</a> •
+  <a href="#repo-layout">Repo Layout</a> •
+  <a href="#the-tipping-point">Decision Rules</a>
+</p>
+
+## Research Snapshot
+
+> **Current call:** drill further, but center the story on **pointwise TabPFN** and treat pairwise TabPFN as an ablation unless later evidence changes that.
+
+| Signal | Current read |
+| --- | --- |
+| Main Phase 1 decision | `drill further` |
+| Strongest method story | Pointwise TabPFN for small-data and cold-start reranking |
+| Strongest benchmark regime | `MovieLens 100K` low-data and item-cold |
+| New adapter finding | `tabpfn_native` helps most in pointwise item-cold reranking |
+| Main caution | Pairwise TabPFN remains expensive and inconsistent |
 
 ## Status
 
@@ -186,6 +221,17 @@ The repo now includes the MVP2 first-sweep benchmark spine:
 - optional model adapters for `XGBoost`, `CatBoost`, and `TabPFN`
 - two TabPFN adapter paths for comparison: the existing one-hot path (`tabpfn`) and an experimental native-categorical path (`tabpfn_native`)
 - benchmark reporting to per-query CSVs, per-run JSON metrics, summary CSV, and markdown benchmark tables
+
+## Result Artifacts
+
+Some useful local artifacts produced so far, when present in a local benchmark workspace:
+
+- `paper/phase1_low_data/decision.md`
+- `paper/phase1_low_data/benchmark.md`
+- `paper/results_tabpfn_native_low_data/movielens_pointwise_low_data_summary.csv`
+- `paper/results_tabpfn_native_amazon/amazon_pointwise_tabpfn_compare_summary_cap25.csv`
+- `paper/figures/tabpfn_adapter_comparison_low_data/index.html`
+- `paper/figures/tabpfn_adapter_comparison_amazon_cap25/index.html`
 
 ## Quickstart
 
