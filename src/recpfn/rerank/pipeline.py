@@ -14,6 +14,7 @@ from recpfn.eval.metrics import evaluate_rankings
 from recpfn.eval.ranking import attach_metadata
 from recpfn.eval.reports import save_benchmark_table, save_metrics, save_predictions, save_summary_csv
 from recpfn.features.builders import build_features
+from recpfn.features.groups import select_feature_columns
 from recpfn.models.base import (
     build_pairwise_training_rows,
     fit_pairwise,
@@ -39,6 +40,8 @@ def run_experiment(
     k: int = 20,
     max_train_queries: int | None = None,
     max_test_queries: int | None = None,
+    train_fraction: float | None = None,
+    feature_set: str = "full",
 ) -> tuple[pd.DataFrame, RunArtifacts]:
     """Run one experiment sweep and persist outputs."""
 
@@ -57,6 +60,8 @@ def run_experiment(
         k=k,
         max_train_queries=max_train_queries,
         max_test_queries=max_test_queries,
+        train_fraction=train_fraction,
+        feature_set=feature_set,
     )
 
     for protocol in protocols:
@@ -70,7 +75,7 @@ def run_experiment(
         features = build_features(dataset, candidates, split)
         train_df = features[features["split"] == "train"].copy()
         test_df = features[features["split"] == "test"].copy()
-        feature_cols = infer_feature_columns(features)
+        feature_cols = select_feature_columns(infer_feature_columns(features), feature_set=feature_set)
 
         for model_name in pointwise_models:
             start = time.perf_counter()
@@ -93,6 +98,7 @@ def run_experiment(
                 continue
             runtime = time.perf_counter() - start
             predictions = attach_metadata(scored, dataset.name, split.split_type, protocol, model_name, "pointwise")
+            predictions = _attach_run_metadata(predictions, run_metadata)
             metrics = evaluate_rankings(predictions)
             metrics["runtime_seconds"] = runtime
             metrics.update(
@@ -153,6 +159,7 @@ def run_experiment(
                     continue
                 runtime = time.perf_counter() - start
                 predictions = attach_metadata(scored, dataset.name, split.split_type, protocol, model_name, "pairwise")
+                predictions = _attach_run_metadata(predictions, run_metadata)
                 metrics = evaluate_rankings(predictions)
                 metrics["runtime_seconds"] = runtime
                 metrics.update(
@@ -231,6 +238,8 @@ def _build_run_metadata(
     k: int,
     max_train_queries: int | None,
     max_test_queries: int | None,
+    train_fraction: float | None = None,
+    feature_set: str = "full",
 ) -> dict[str, object]:
     return {
         "tabpfn_version": read_env_str("RECPFN_TABPFN_VERSION", "v2"),
@@ -238,7 +247,16 @@ def _build_run_metadata(
         "max_train_queries": max_train_queries,
         "max_test_queries": max_test_queries,
         "seed": int(seed),
+        "train_fraction": train_fraction,
+        "feature_set": feature_set,
     }
+
+
+def _attach_run_metadata(frame: pd.DataFrame, run_metadata: dict[str, object]) -> pd.DataFrame:
+    enriched = frame.copy()
+    for key, value in run_metadata.items():
+        enriched[key] = value
+    return enriched
 
 
 def _failure_row(

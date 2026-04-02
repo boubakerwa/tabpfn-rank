@@ -6,6 +6,7 @@ from collections import defaultdict
 
 import pandas as pd
 
+from recpfn.data.history import build_user_history_index, history_before_query
 from recpfn.data.schemas import (
     CANDIDATE_POSITION_COL,
     ITEM_ID_COL,
@@ -59,8 +60,13 @@ def build_candidates(
 
     rows = []
     queries = pd.concat([split.train_queries, split.test_queries], ignore_index=True)
+    user_histories, empty_history = build_user_history_index(split.train_interactions)
     for query in queries.itertuples(index=False):
-        history = _history_before_query(split.train_interactions, query.user_id, query.query_timestamp, query.query_interaction_id)
+        history = history_before_query(
+            user_histories.get(query.user_id, empty_history),
+            query.query_timestamp,
+            query.query_interaction_id,
+        )
         seen_items = set(history[ITEM_ID_COL].tolist())
         target_item = query.item_id
         target_context = None
@@ -107,17 +113,3 @@ def build_candidates(
             )
 
     return pd.DataFrame(rows)
-
-
-def _history_before_query(
-    interactions: pd.DataFrame,
-    user_id: object,
-    query_timestamp: pd.Timestamp,
-    query_interaction_id: int,
-) -> pd.DataFrame:
-    user_rows = interactions[interactions[USER_ID_COL] == user_id]
-    earlier_ts = user_rows["timestamp"] < query_timestamp
-    same_ts_earlier_id = (user_rows["timestamp"] == query_timestamp) & (
-        user_rows["interaction_id"] < query_interaction_id
-    )
-    return user_rows[earlier_ts | same_ts_earlier_id]

@@ -15,33 +15,45 @@ def evaluate_rankings(
 ) -> dict[str, float]:
     """Aggregate ranking metrics across queries."""
 
-    scores = {metric: [] for metric in metrics}
-    query_count = 0
-    for _, group in predictions_df.groupby(QUERY_ID_COL):
+    per_query = evaluate_rankings_by_query(predictions_df, metrics=metrics)
+    aggregated = {metric: float(per_query[metric].mean()) for metric in metrics}
+    aggregated["n_queries"] = float(len(per_query))
+    return aggregated
+
+
+def evaluate_rankings_by_query(
+    predictions_df: pd.DataFrame,
+    metrics: tuple[str, ...] = ("ndcg@10", "recall@10", "mrr", "hitrate@10"),
+) -> pd.DataFrame:
+    """Compute ranking metrics per query."""
+
+    rows = []
+    for query_id, group in predictions_df.groupby(QUERY_ID_COL):
         ordered = group.sort_values("score", ascending=False).reset_index(drop=True)
         labels = ordered[LABEL_COL].astype(int).tolist()
-        query_count += 1
+        row = {QUERY_ID_COL: query_id}
         for metric in metrics:
-            if metric == "ndcg@10":
-                scores[metric].append(_ndcg_at_k(labels, 10))
-            elif metric == "ndcg@5":
-                scores[metric].append(_ndcg_at_k(labels, 5))
-            elif metric == "recall@10":
-                scores[metric].append(_recall_at_k(labels, 10))
-            elif metric == "recall@5":
-                scores[metric].append(_recall_at_k(labels, 5))
-            elif metric == "mrr":
-                scores[metric].append(_mrr(labels))
-            elif metric == "map":
-                scores[metric].append(_average_precision(labels))
-            elif metric == "hitrate@10":
-                scores[metric].append(_hit_rate_at_k(labels, 10))
-            else:
-                raise ValueError(f"Unsupported metric '{metric}'.")
+            row[metric] = _score_metric(labels, metric)
+        rows.append(row)
+    return pd.DataFrame(rows)
 
-    aggregated = {metric: float(sum(values) / max(1, len(values))) for metric, values in scores.items()}
-    aggregated["n_queries"] = float(query_count)
-    return aggregated
+
+def _score_metric(labels: list[int], metric: str) -> float:
+    if metric == "ndcg@10":
+        return _ndcg_at_k(labels, 10)
+    if metric == "ndcg@5":
+        return _ndcg_at_k(labels, 5)
+    if metric == "recall@10":
+        return _recall_at_k(labels, 10)
+    if metric == "recall@5":
+        return _recall_at_k(labels, 5)
+    if metric == "mrr":
+        return _mrr(labels)
+    if metric == "map":
+        return _average_precision(labels)
+    if metric == "hitrate@10":
+        return _hit_rate_at_k(labels, 10)
+    raise ValueError(f"Unsupported metric '{metric}'.")
 
 
 def _dcg_at_k(labels: list[int], k: int) -> float:

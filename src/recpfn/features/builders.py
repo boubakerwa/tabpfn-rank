@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from recpfn.data.history import build_user_history_index, history_before_query
 from recpfn.data.schemas import (
     ITEM_ID_COL,
     LABEL_COL,
@@ -29,6 +30,7 @@ def build_features(dataset: DatasetBundle, candidates: pd.DataFrame, split: Spli
         right_index=True,
         how="left",
     )
+    user_histories, empty_history = build_user_history_index(train_interactions)
 
     popularity = item_training_popularity(split.train_interactions)
     item_positive_rate = (
@@ -43,9 +45,8 @@ def build_features(dataset: DatasetBundle, candidates: pd.DataFrame, split: Spli
         query_timestamp = query_row[QUERY_TIMESTAMP_COL]
         query_interaction_id = query_row[QUERY_INTERACTION_ID_COL]
 
-        user_history = _history_before_query(
-            train_interactions,
-            user_id=user_id,
+        user_history = history_before_query(
+            user_histories.get(user_id, empty_history),
             query_timestamp=query_timestamp,
             query_interaction_id=query_interaction_id,
         )
@@ -103,22 +104,6 @@ def build_features(dataset: DatasetBundle, candidates: pd.DataFrame, split: Spli
             "item_brand": "unknown",
         }
     )
-
-
-def _history_before_query(
-    interactions: pd.DataFrame,
-    user_id: object,
-    query_timestamp: pd.Timestamp,
-    query_interaction_id: int,
-) -> pd.DataFrame:
-    user_rows = interactions[interactions[USER_ID_COL] == user_id]
-    earlier_ts = user_rows["timestamp"] < query_timestamp
-    same_ts_earlier_id = (user_rows["timestamp"] == query_timestamp) & (
-        user_rows["interaction_id"] < query_interaction_id
-    )
-    return user_rows[earlier_ts | same_ts_earlier_id]
-
-
 def _coerce_numeric(value: object, default: float = 0.0) -> float:
     if value is None:
         return default

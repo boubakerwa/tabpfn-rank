@@ -35,6 +35,7 @@
 | Strongest method story | Pointwise TabPFN for small-data and cold-start reranking |
 | Strongest benchmark regime | `MovieLens 100K` low-data and item-cold |
 | New adapter finding | `tabpfn_native` helps most in pointwise item-cold reranking |
+| Phase 2 workflow | Implemented with multi-seed reporting, bootstrap deltas, K-sensitivity, and feature-group ablation |
 | Main caution | Pairwise TabPFN remains expensive and inconsistent |
 
 ## Status
@@ -221,6 +222,9 @@ The repo now includes the MVP2 first-sweep benchmark spine:
 - optional model adapters for `XGBoost`, `CatBoost`, and `TabPFN`
 - two TabPFN adapter paths for comparison: the existing one-hot path (`tabpfn`) and an experimental native-categorical path (`tabpfn_native`)
 - benchmark reporting to per-query CSVs, per-run JSON metrics, summary CSV, and markdown benchmark tables
+- a dedicated Phase 2 pointwise workflow:
+  - `recpfn.phase2_pointwise_run` for raw multi-seed benchmark units
+  - `recpfn.phase2_pointwise_report` for aggregation, bootstrap delta summaries, plots, and the Phase 2 decision memo
 
 ## Result Artifacts
 
@@ -264,6 +268,27 @@ python -m recpfn.phase1_decision \
   --output-dir paper/phase1_decision \
   --reuse-existing
 ```
+
+To run the new Phase 2 pointwise validation workflow:
+
+```bash
+python -m recpfn.phase2_pointwise_run \
+  --run-output-dir paper/results_phase2_pointwise_runs
+
+python -m recpfn.phase2_pointwise_report \
+  --run-output-dir paper/results_phase2_pointwise_runs \
+  --output-dir paper/phase2_pointwise \
+  --plots-output-dir paper/figures/phase2_pointwise
+```
+
+This Phase 2 workflow keeps Phase 1 frozen and focuses on:
+
+- multi-seed `MovieLens 100K` pointwise validation
+- `tabpfn` vs `tabpfn_native` head-to-head comparison
+- paired query-level bootstrap deltas on key slices
+- targeted `K=20/50/100` sensitivity on MovieLens
+- a capped Amazon pointwise sanity pass
+- feature-group ablations on the best cold-start slices
 
 For the Amazon loader, you can cap raw ingestion during development:
 

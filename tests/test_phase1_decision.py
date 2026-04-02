@@ -84,6 +84,40 @@ def test_load_existing_phase1_results_marks_phase_and_snapshot(tmp_path):
     assert snapshot["missing_units_count"] == 63
 
 
+def test_load_existing_phase1_results_prefers_phase_column_over_path(tmp_path):
+    result_path = (
+        tmp_path
+        / "canonical_pointwise"
+        / "movielens_100k__warm__global_popularity__pointwise__tabpfn"
+        / "movielens_100k"
+        / "warm"
+        / "results.csv"
+    )
+    result_path.parent.mkdir(parents=True)
+    pd.DataFrame(
+        [
+            _row(
+                "movielens_100k",
+                "warm",
+                "global_popularity",
+                "pointwise",
+                "tabpfn",
+                0.83,
+                0.90,
+                0.81,
+                20.0,
+                phase="tie_break",
+                train_fraction=0.5,
+            )
+        ]
+    ).to_csv(result_path, index=False)
+
+    results = load_existing_phase1_results(tmp_path)
+
+    assert results.iloc[0]["phase"] == "tie_break"
+    assert results.iloc[0]["train_fraction"] == 0.5
+
+
 def _row(
     dataset: str,
     split_type: str,

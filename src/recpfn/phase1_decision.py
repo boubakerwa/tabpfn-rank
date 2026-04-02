@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import argparse
 import math
-import os
-import subprocess
-import sys
-import time
-from contextlib import contextmanager
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import pandas as pd
 
+from recpfn.benchmark_runner import (
+    DEFAULT_UNIT_TIMEOUT_SECONDS,
+    ProgressTracker,
+    concat_results as _concat_results,
+    run_unit_matrix as _run_unit_matrix,
+    run_unit_subprocess as _run_unit_subprocess,
+    temporary_env as _temporary_env,
+)
 from recpfn.data.loaders import load_dataset
 from recpfn.data.splits import build_splits
 from recpfn.eval.reports import save_benchmark_table, save_summary_csv
@@ -40,31 +41,6 @@ LEARNED_MODELS = {"xgboost", "catboost", "tabpfn"}
 TIE_BREAK_FRACTIONS = [0.1, 0.2, 0.5, 1.0]
 
 
-@dataclass
-class ProgressTracker:
-    """Simple terminal progress reporter for long benchmark sweeps."""
-
-    total_units: int
-    started_units: int = 0
-    finished_units: int = 0
-
-    def announce_start(self, label: str) -> int:
-        self.started_units += 1
-        unit_no = self.started_units
-        print(f"[{unit_no}/{self.total_units}] Starting {label}", flush=True)
-        return unit_no
-
-    def announce_finish(self, unit_no: int, label: str, elapsed_seconds: float, status: str) -> None:
-        self.finished_units += 1
-        print(
-            f"[{unit_no}/{self.total_units}] {status} {label} in {elapsed_seconds:.1f}s",
-            flush=True,
-        )
-
-    def extend(self, additional_units: int) -> None:
-        self.total_units += additional_units
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the canonical Phase 1 decision sweep.")
     parser.add_argument("--cache-dir", default="data")
@@ -74,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-train-queries", type=int, default=CANONICAL_MAX_TRAIN_QUERIES)
     parser.add_argument("--max-test-queries", type=int, default=CANONICAL_MAX_TEST_QUERIES)
     parser.add_argument("--k", type=int, default=CANONICAL_K)
+    parser.add_argument("--unit-timeout-seconds", type=int, default=DEFAULT_UNIT_TIMEOUT_SECONDS)
     parser.add_argument("--skip-tie-break", action="store_true")
     parser.add_argument(
         "--reuse-existing",
@@ -95,6 +72,7 @@ def main() -> None:
             max_train_queries=args.max_train_queries,
             max_test_queries=args.max_test_queries,
             k=args.k,
+            unit_timeout_seconds=args.unit_timeout_seconds,
         )
     else:
         results, artifacts, decision = run_phase1_decision(
@@ -106,6 +84,7 @@ def main() -> None:
             max_test_queries=args.max_test_queries,
             k=args.k,
             allow_tie_break=not args.skip_tie_break,
+            unit_timeout_seconds=args.unit_timeout_seconds,
         )
     print(results.to_string(index=False))
     print(f"\nDecision outcome: {decision['outcome']}")
@@ -126,6 +105,7 @@ def run_phase1_decision(
     max_test_queries: int = CANONICAL_MAX_TEST_QUERIES,
     k: int = CANONICAL_K,
     allow_tie_break: bool = True,
+    unit_timeout_seconds: int = DEFAULT_UNIT_TIMEOUT_SECONDS,
 ) -> tuple[pd.DataFrame, Phase1DecisionArtifacts, dict[str, object]]:
     """Run the canonical benchmark matrix and emit decision artifacts."""
 
@@ -170,6 +150,7 @@ def run_phase1_decision(
                         max_train_queries=max_train_queries,
                         max_test_queries=max_test_queries,
                         tracker=tracker,
+                        timeout_seconds=unit_timeout_seconds,
                     )
                     pairwise_results = _run_unit_matrix(
                         dataset_name=dataset_name,
@@ -184,6 +165,7 @@ def run_phase1_decision(
                         max_train_queries=max_train_queries,
                         max_test_queries=max_test_queries,
                         tracker=tracker,
+                        timeout_seconds=unit_timeout_seconds,
                     )
                     results = _concat_results([pointwise_results, pairwise_results]).copy()
                     results["phase"] = "canonical"
@@ -205,6 +187,7 @@ def run_phase1_decision(
                     canonical_max_train_queries=max_train_queries,
                     max_test_queries=max_test_queries,
                     tracker=tracker,
+                    timeout_seconds=unit_timeout_seconds,
                 )
                 artifacts.tie_break_results_path = save_summary_csv(
                     tie_break_results,
@@ -256,9 +239,11 @@ def summarize_existing_phase1_runs(
     max_train_queries: int = CANONICAL_MAX_TRAIN_QUERIES,
     max_test_queries: int = CANONICAL_MAX_TEST_QUERIES,
     k: int = CANONICAL_K,
+    unit_timeout_seconds: int = DEFAULT_UNIT_TIMEOUT_SECONDS,
 ) -> tuple[pd.DataFrame, Phase1DecisionArtifacts, dict[str, object]]:
     """Merge already-completed Phase 1 units and emit decision artifacts without rerunning benchmarks."""
 
+    del unit_timeout_seconds
     decision_root = ensure_dir(output_dir)
     raw_run_root = ensure_dir(run_output_dir)
     artifacts = Phase1DecisionArtifacts(output_dir=decision_root, run_output_dir=raw_run_root)
@@ -323,6 +308,7 @@ def run_movie_lens_tie_break(
     canonical_max_train_queries: int,
     max_test_queries: int,
     tracker: ProgressTracker,
+    timeout_seconds: int = DEFAULT_UNIT_TIMEOUT_SECONDS,
 ) -> pd.DataFrame:
     """Run the low-data tie-break sweep on MovieLens only."""
 
@@ -344,6 +330,8 @@ def run_movie_lens_tie_break(
                 max_train_queries=max_train_queries,
                 max_test_queries=max_test_queries,
                 tracker=tracker,
+                timeout_seconds=timeout_seconds,
+                train_fraction=float(train_fraction),
             )
             pairwise_results = _run_unit_matrix(
                 dataset_name=PRIMARY_DATASET,
@@ -358,6 +346,8 @@ def run_movie_lens_tie_break(
                 max_train_queries=max_train_queries,
                 max_test_queries=max_test_queries,
                 tracker=tracker,
+                timeout_seconds=timeout_seconds,
+                train_fraction=float(train_fraction),
             )
             results = _concat_results([pointwise_results, pairwise_results]).copy()
             results["phase"] = "tie_break"
@@ -700,12 +690,16 @@ def load_existing_phase1_results(run_output_dir: str | Path) -> pd.DataFrame:
         frame = pd.read_csv(path)
         if frame.empty:
             continue
-        phase = "tie_break" if "tie_break" in path.parts else "canonical"
         frame = frame.copy()
+        fallback_phase = "tie_break" if "tie_break" in path.parts else "canonical"
+        phase = None
         if "phase" not in frame.columns:
-            frame["phase"] = phase
+            frame["phase"] = fallback_phase
+            phase = fallback_phase
         else:
-            frame["phase"] = frame["phase"].fillna(phase)
+            frame["phase"] = frame["phase"].fillna(fallback_phase)
+            non_null_phase = frame["phase"].dropna()
+            phase = str(non_null_phase.iloc[0]) if not non_null_phase.empty else fallback_phase
         if "train_fraction" not in frame.columns:
             frame["train_fraction"] = pd.NA
         if phase == "tie_break":
@@ -733,122 +727,6 @@ def snapshot_status(results: pd.DataFrame) -> dict[str, object]:
         "missing_units_count": len(missing),
         "missing_units": missing,
     }
-
-
-def _concat_results(frames: list[pd.DataFrame]) -> pd.DataFrame:
-    valid_frames = [frame for frame in frames if frame is not None and not frame.empty]
-    if not valid_frames:
-        return pd.DataFrame()
-    return pd.concat(valid_frames, ignore_index=True)
-
-
-def _run_unit_matrix(
-    dataset_name: str,
-    split_type: str,
-    protocols: list[str],
-    models: list[str],
-    mode: str,
-    cache_dir: str | Path,
-    output_dir: str | Path,
-    seed: int,
-    k: int,
-    max_train_queries: int | None,
-    max_test_queries: int | None,
-    tracker: ProgressTracker,
-) -> pd.DataFrame:
-    frames = []
-    for protocol in protocols:
-        for model in models:
-            frames.append(
-                _run_unit_subprocess(
-                    dataset_name=dataset_name,
-                    split_type=split_type,
-                    protocol=protocol,
-                    mode=mode,
-                    model=model,
-                    cache_dir=cache_dir,
-                    output_dir=output_dir,
-                    seed=seed,
-                    k=k,
-                    max_train_queries=max_train_queries,
-                    max_test_queries=max_test_queries,
-                    tracker=tracker,
-                )
-            )
-    return _concat_results(frames)
-
-
-def _run_unit_subprocess(
-    dataset_name: str,
-    split_type: str,
-    protocol: str,
-    mode: str,
-    model: str,
-    cache_dir: str | Path,
-    output_dir: str | Path,
-    seed: int,
-    k: int,
-    max_train_queries: int | None,
-    max_test_queries: int | None,
-    tracker: ProgressTracker,
-) -> pd.DataFrame:
-    unit_name = f"{dataset_name}__{split_type}__{protocol}__{mode}__{model}".replace(".", "_")
-    unit_output_dir = ensure_dir(Path(output_dir) / unit_name)
-    log_path = unit_output_dir / "run.log"
-    label = f"{dataset_name} {split_type} {protocol} {mode} {model}"
-    unit_no = tracker.announce_start(label)
-    started_at = time.perf_counter()
-    command = [
-        sys.executable,
-        "-m",
-        "recpfn.unit_runner",
-        "--dataset",
-        dataset_name,
-        "--split",
-        split_type,
-        "--protocol",
-        protocol,
-        "--mode",
-        mode,
-        "--model",
-        model,
-        "--cache-dir",
-        str(cache_dir),
-        "--output-dir",
-        str(unit_output_dir),
-        "--seed",
-        str(seed),
-        "--k",
-        str(k),
-    ]
-    if max_train_queries is not None:
-        command.extend(["--max-train-queries", str(max_train_queries)])
-    if max_test_queries is not None:
-        command.extend(["--max-test-queries", str(max_test_queries)])
-
-    try:
-        with log_path.open("w", encoding="utf-8") as handle:
-            subprocess.run(
-                command,
-                check=True,
-                cwd=Path(__file__).resolve().parents[2],
-                env=os.environ.copy(),
-                stdout=handle,
-                stderr=subprocess.STDOUT,
-            )
-        result_path = unit_output_dir / dataset_name / split_type / "results.csv"
-        frame = pd.read_csv(result_path)
-    except subprocess.CalledProcessError:
-        tracker.announce_finish(
-            unit_no,
-            f"{label} (see {log_path})",
-            time.perf_counter() - started_at,
-            status="FAILED",
-        )
-        raise
-
-    tracker.announce_finish(unit_no, label, time.perf_counter() - started_at, status="Done")
-    return frame
 
 
 def _query_item_sets(frame: pd.DataFrame) -> dict[str, set[object]]:
@@ -1083,19 +961,6 @@ def _canonical_unit_count() -> int:
 
 def _tie_break_unit_count() -> int:
     return len(CANONICAL_SPLITS) * len(TIE_BREAK_FRACTIONS) * (3 + 3)
-
-
-@contextmanager
-def _temporary_env(name: str, value: str) -> Iterator[None]:
-    previous = os.environ.get(name)
-    os.environ[name] = value
-    try:
-        yield
-    finally:
-        if previous is None:
-            os.environ.pop(name, None)
-        else:
-            os.environ[name] = previous
 
 
 if __name__ == "__main__":

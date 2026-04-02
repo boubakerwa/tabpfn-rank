@@ -48,7 +48,10 @@ def save_benchmark_table(
     selected_columns = [column for column in selected_columns if column in results.columns]
     selected_sort = sort_by or ["dataset", "split_type", "protocol", "mode", "model"]
     selected_sort = [column for column in selected_sort if column in results.columns]
-    table = results[results["status"] == "ok"][selected_columns]
+    table = results.copy()
+    if "status" in table.columns:
+        table = table[table["status"] == "ok"]
+    table = table[selected_columns]
     if selected_sort:
         table = table.sort_values(selected_sort)
     with path.open("w", encoding="utf-8") as handle:

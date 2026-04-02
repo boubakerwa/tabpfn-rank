@@ -20,6 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--k", type=int, default=20)
     parser.add_argument("--max-train-queries", type=int, default=None)
     parser.add_argument("--max-test-queries", type=int, default=None)
+    parser.add_argument("--train-fraction", type=float, default=None)
+    parser.add_argument("--feature-set", default="full")
     return parser
 
 
@@ -40,6 +42,8 @@ def main() -> None:
         k=args.k,
         max_train_queries=args.max_train_queries,
         max_test_queries=args.max_test_queries,
+        train_fraction=args.train_fraction,
+        feature_set=args.feature_set,
     )
     if results.empty:
         print("No results produced.")

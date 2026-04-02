@@ -63,3 +63,20 @@ class Phase1DecisionArtifacts:
     tie_break_results_path: Path | None = None
     next_steps_plan_path: Path | None = None
     plots_output_dir: Path | None = None
+
+
+@dataclass
+class Phase2PointwiseArtifacts:
+    """Paths emitted by the phase-two pointwise validation workflow."""
+
+    output_dir: Path
+    run_output_dir: Path
+    plots_output_dir: Path
+    raw_summary_path: Path | None = None
+    aggregated_results_path: Path | None = None
+    bootstrap_delta_summary_path: Path | None = None
+    k_sensitivity_results_path: Path | None = None
+    amazon_sanity_results_path: Path | None = None
+    feature_group_ablation_path: Path | None = None
+    benchmark_table_path: Path | None = None
+    decision_memo_path: Path | None = None
