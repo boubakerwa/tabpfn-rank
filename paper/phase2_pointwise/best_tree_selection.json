@@ -1,0 +1,6 @@
+{
+  "item_cold::context_popularity": "catboost",
+  "item_cold::global_popularity": "catboost",
+  "warm::context_popularity": "catboost",
+  "warm::global_popularity": "catboost"
+}

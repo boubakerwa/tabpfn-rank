@@ -10,16 +10,17 @@
 
 <p align="center">
   <a href="https://github.com/boubakerwa/tabpfn-rank"><img alt="repo" src="https://img.shields.io/badge/repo-tabpfn--rank-111827"></a>
-  <img alt="phase" src="https://img.shields.io/badge/phase-1%20complete-0f766e">
-  <img alt="decision" src="https://img.shields.io/badge/decision-drill%20further-2563eb">
-  <img alt="focus" src="https://img.shields.io/badge/focus-pointwise%20TabPFN-7c3aed">
+  <img alt="phase" src="https://img.shields.io/badge/phase-2%20pointwise%20validated-0f766e">
+  <img alt="decision" src="https://img.shields.io/badge/decision-pointwise%20story%20holds-2563eb">
+  <img alt="focus" src="https://img.shields.io/badge/focus-targeted%20native%20adapter-7c3aed">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-0ea5e9">
   <img alt="datasets" src="https://img.shields.io/badge/datasets-MovieLens%20%7C%20Amazon-f59e0b">
 </p>
 
 <p align="center">
   <a href="#research-snapshot">Snapshot</a> •
-  <a href="#phase-1-findings">Findings</a> •
+  <a href="#phase-2-findings">Findings</a> •
+  <a href="#tracked-results">Tracked Results</a> •
   <a href="#quickstart">Quickstart</a> •
   <a href="#repo-layout">Repo Layout</a> •
   <a href="#the-tipping-point">Decision Rules</a>
@@ -31,58 +32,42 @@
 
 | Signal | Current read |
 | --- | --- |
-| Main Phase 1 decision | `drill further` |
+| Main evidence state | Phase 2 pointwise sweep complete and summarized |
 | Strongest method story | Pointwise TabPFN for small-data and cold-start reranking |
-| Strongest benchmark regime | `MovieLens 100K` low-data and item-cold |
-| New adapter finding | `tabpfn_native` helps most in pointwise item-cold reranking |
-| Phase 2 workflow | Implemented with multi-seed reporting, bootstrap deltas, K-sensitivity, and feature-group ablation |
-| Main caution | Pairwise TabPFN remains expensive and inconsistent |
+| Strongest benchmark regime | `MovieLens 100K` warm/global and item-cold |
+| Native adapter outcome | `tabpfn_native` is a targeted cold-start/global-popularity variant |
+| Tracked artifact bundle | `paper/phase2_pointwise/` |
+| Main caution | Trees still dominate runtime, and `tabpfn_native` is not a universal replacement |
 
 ## Status
 
-This repository is intentionally initialized as a research project first, not as a full product or framework.
+This repository is still intentionally run as a research project first, not as a polished product library.
 
-Phase 1 exists to answer a single question:
+Phase 1 is frozen. The Phase 2 pointwise validation sweep is now complete, the reporting layer is restored, and the current state of the evidence is tracked in-repo.
 
-> Is there enough real signal here to justify a deeper OSS library and an arXiv-level paper?
+## Phase 2 Findings
 
-If the answer is no, we stop early or keep only the benchmark artifacts.
+- On the four key `MovieLens 100K` pointwise slices at `100%` train, `K=20`, and `3` seeds, a TabPFN variant beat the best tree baseline every time:
+  - `warm / global_popularity`: `tabpfn_native 0.8416` vs `catboost 0.7956`
+  - `warm / context_popularity`: `tabpfn 0.5431` vs `catboost 0.5023`
+  - `item_cold / global_popularity`: `tabpfn_native 0.9852` vs `catboost 0.9740`
+  - `item_cold / context_popularity`: `tabpfn 0.8286` vs `catboost 0.7741`
+- The overall pointwise TabPFN story holds. The best TabPFN variant stayed within `1%` of the best tree on `4/4` key MovieLens slices, and in practice beat it on all four.
+- `tabpfn_native` is useful but not universal. It had positive mean `NDCG@10` deltas on `2/4` key slices and a `0.782x` median runtime ratio versus the one-hot TabPFN path, so it is best treated as a targeted cold-start / global-popularity adapter rather than a full replacement.
+- The low-data story is still real. On `MovieLens warm / global_popularity`, a TabPFN variant was best at `10%`, `20%`, `50%`, and `100%`. On `MovieLens item_cold / global_popularity`, `tabpfn_native` beat the one-hot path at every train fraction from `10%` to `100%`.
+- Candidate-pool sensitivity is encouraging but not uniformly easy. On `item_cold / global_popularity`, `tabpfn_native` retained `1.006x` of its `K=20` quality at `K=50` and still reached `0.9753` at `K=100`. Warm and context-heavy slices degrade more as `K` grows.
+- Amazon remains secondary evidence. The `context_popularity` slices support the same direction:
+  - `warm`: `tabpfn_native 0.5697`
+  - `item_cold`: `tabpfn_native 0.9380`
+  while `global_popularity` is saturated and should not drive the main claim.
+- Feature-group ablations suggest the gains are not just coming from user demographics. On `MovieLens item_cold`, removing interaction history or using metadata-only causes a large drop for both TabPFN variants, while removing user metadata changes little.
 
-## Phase 1 Findings
+## Current Read
 
-Phase 1 now has a clear decision: **drill further**, but center the next phase on **pointwise TabPFN**, not pairwise TabPFN.
-
-- The strongest positive signal is the low-data warm-start ladder on `MovieLens`. Pointwise TabPFN was best at `10%`, `20%`, and `50%` train scale with `NDCG@10 = 0.8362`, `0.8306`, and `0.8315`.
-- The strongest cold-start pointwise signal remains `MovieLens item_cold / context_popularity`, where pointwise TabPFN reached `0.9087` vs the best tree baseline at `0.8755`.
-- The Amazon context-aware signal is still positive but secondary: `Amazon warm / context_popularity` pointwise TabPFN reached `0.6143` vs the best tree at `0.4646`.
-- Pairwise TabPFN is not the lead story. In the low-data ladder it only became best at `MovieLens warm / 100%` (`0.8412`), and it stayed expensive throughout.
-- On `MovieLens item_cold / global_popularity`, pairwise TabPFN was strong at full data (`0.9742`) but still slightly behind the best tree (`0.9769`).
-- The missing canonical block remains the narrow `amazon_baby_products / item_cold / context_popularity / pairwise` corner, and it is non-blocking for the Phase 1 decision.
-
-Important caveats:
-
-- In the low-data ladder, pairwise TabPFN runtimes ranged from about `141s` to `407s`, versus roughly `6s` to `24s` for pointwise TabPFN.
-- `Amazon / global_popularity` is partly saturated and should not drive the main paper claim.
-- The current Amazon result is still provisional because the local run used a capped review slice.
-
-## Adapter Comparison
-
-We also added a parallel experimental adapter, `tabpfn_native`, that keeps categorical columns in mixed-type tabular form instead of routing TabPFN through the shared one-hot path.
-
-- On `MovieLens 100K` pointwise reranking, `tabpfn_native` was strongest on the `item_cold / global_popularity` ladder: it beat the existing one-hot TabPFN path at `10%`, `20%`, `50%`, and `100%` train scale, with `NDCG@10` gains of `+0.0417`, `+0.0314`, `+0.0044`, and `+0.0235`.
-- It was also faster in every one of those item-cold runs.
-- The effect is regime-dependent, not universal: the native path lost on the `MovieLens` `context_popularity` pointwise checks and on the initial pairwise comparison.
-- A small capped Amazon pointwise check (`25/25` queries) was also mixed: `tabpfn_native` won on `warm / context_popularity` (`0.7507` vs `0.7102`) and was dramatically faster, but the original one-hot path won on `item_cold / context_popularity` (`0.7903` vs `0.7045`).
-
-Current interpretation: **TabPFN feature representation is itself an important experimental variable**, and native categorical handling looks most promising for **pointwise cold-start reranking**, not for pairwise ranking.
-
-## Immediate Next Step
-
-The next step is no longer more Phase 1 benchmarking. It is to freeze Phase 1 and start MVP 3 with the right scope:
-
-1. Treat **pointwise TabPFN for small-data and cold-start reranking** as the main method story.
-2. Keep pairwise TabPFN as an ablation unless later targeted evidence changes that.
-3. Turn the current benchmark table, memo, and figure set into one concise writeup.
+- The project is worth pushing forward.
+- The main story is **pointwise TabPFN for small-data and cold-start reranking**.
+- `tabpfn_native` should be described as a **targeted adapter variant**, not the new default.
+- Pairwise TabPFN stays out of the headline unless later evidence changes that.
 
 ## Core Research Question
 
@@ -118,54 +103,25 @@ The practical framing is narrow on purpose:
 
 ### Phase 1: Validate Or Kill
 
-Goal: get enough evidence, quickly, to decide whether this deserves deeper investment.
+Completed. This phase established the benchmark spine, the dataset loaders, the split builders, and enough early evidence to justify a deeper pointwise validation pass.
 
-Minimum Phase 1 deliverables:
+### Phase 2: Pointwise Validation
 
-1. Two public datasets with reproducible loaders.
-2. Fixed candidate-set generation protocol for each dataset.
-3. Warm-start, item cold-start, and if feasible user cold-start splits.
-4. Baselines:
-   - popularity / recent popularity
-   - XGBoost pointwise
-   - CatBoost pointwise
-   - XGBoost ranking or pairwise baseline
-   - CatBoost ranking or pairwise baseline
-   - TabPFN pointwise
-   - TabPFN pairwise
-5. Metrics:
-   - NDCG@10
-   - Recall@10
-   - MRR
-   - HitRate@10
-   - runtime / latency
-6. One compact benchmark table that we would be comfortable showing publicly.
+Completed. This phase added the multi-seed pointwise matrix, bootstrap deltas, `K`-sensitivity, Amazon sanity checks, and feature-group ablations that now back the current read.
 
-Planned dataset path:
+### Next: Decision + Writeup
 
-- `MovieLens 100K`
-- one metadata-rich public dataset from `Amazon Reviews 2023`
+The next project step is to turn the Phase 2 evidence bundle into a narrow decision about scope:
 
-Fallback if Amazon setup becomes awkward for the MVP:
-
-- `MIND-small` as a reranking-style benchmark with impression groups already defined
-
-### Phase 2: Drill Further Only If Earned
-
-We only move into deeper method and library work if Phase 1 produces a credible signal.
-
-Possible Phase 2 work:
-
-- cleaner public Python API
-- better experiment CLI
-- pairwise TabPFN scoring refinements
-- list-context ablations
-- stronger cold-start protocols
-- tighter writeup targeting an arXiv preprint
+1. keep the paper centered on **pointwise TabPFN**,
+2. present `tabpfn_native` as a targeted adapter result,
+3. decide how much additional method work is actually justified before drafting.
 
 ## The Tipping Point
 
-We continue past Phase 1 only if at least one of the following is true:
+Phase 1 has already crossed this threshold. The current Phase 2 pointwise decision is tracked in `paper/phase2_pointwise/decision.md`.
+
+We continue only if at least one of the following is true:
 
 1. Pairwise TabPFN beats pointwise TabPFN by a clearly meaningful margin on at least one key regime.
    Practical threshold: about `+0.02` absolute `NDCG@10`, or a similarly meaningful gain in `Recall@10`, on warm-start, item cold-start, or a low-data setting.
@@ -226,16 +182,26 @@ The repo now includes the MVP2 first-sweep benchmark spine:
   - `recpfn.phase2_pointwise_run` for raw multi-seed benchmark units
   - `recpfn.phase2_pointwise_report` for aggregation, bootstrap delta summaries, plots, and the Phase 2 decision memo
 
-## Result Artifacts
+## Tracked Results
 
-Some useful local artifacts produced so far, when present in a local benchmark workspace:
+The main Phase 2 evidence bundle is now tracked in-repo:
 
-- `paper/phase1_low_data/decision.md`
-- `paper/phase1_low_data/benchmark.md`
-- `paper/results_tabpfn_native_low_data/movielens_pointwise_low_data_summary.csv`
-- `paper/results_tabpfn_native_amazon/amazon_pointwise_tabpfn_compare_summary_cap25.csv`
-- `paper/figures/tabpfn_adapter_comparison_low_data/index.html`
-- `paper/figures/tabpfn_adapter_comparison_amazon_cap25/index.html`
+- `paper/phase2_pointwise/decision.md`
+- `paper/phase2_pointwise/benchmark.md`
+- `paper/phase2_pointwise/aggregated_results.csv`
+- `paper/phase2_pointwise/bootstrap_delta_summary.csv`
+- `paper/phase2_pointwise/k_sensitivity_results.csv`
+- `paper/phase2_pointwise/amazon_sanity_results.csv`
+- `paper/phase2_pointwise/feature_group_ablation.csv`
+- `paper/phase2_pointwise/raw_summary.csv`
+- `paper/phase2_pointwise/best_tree_selection.json`
+- `paper/figures/phase2_pointwise/adapter_delta_by_train_fraction.png`
+- `paper/figures/phase2_pointwise/runtime_by_train_fraction.png`
+- `paper/figures/phase2_pointwise/metric_by_k.png`
+- `paper/figures/phase2_pointwise/native_minus_one_hot_by_slice.png`
+- `paper/figures/phase2_pointwise/best_tabpfn_vs_best_tree.png`
+
+The raw Phase 2 per-unit run tree under `paper/results_phase2_pointwise_runs/` is intentionally left untracked because it is large (`~421MB`) and reproducible from the committed code.
 
 ## Quickstart
 
@@ -258,7 +224,20 @@ python -m recpfn.cli \
   --max-test-queries 100
 ```
 
-Outputs are written under `paper/results/<dataset>/<split>/`.
+Run the full Phase 2 pointwise sweep and reporting flow:
+
+```bash
+RECPFN_TABPFN_VERSION=v2.5 TABPFN_ALLOW_CPU_LARGE_DATASET=1 \
+python -m recpfn.phase2_pointwise_run \
+  --run-output-dir paper/results_phase2_pointwise_runs
+
+python -m recpfn.phase2_pointwise_report \
+  --run-output-dir paper/results_phase2_pointwise_runs \
+  --output-dir paper/phase2_pointwise \
+  --plots-output-dir paper/figures/phase2_pointwise
+```
+
+Raw Phase 2 units are written under `paper/results_phase2_pointwise_runs/`, and the tracked summaries land in `paper/phase2_pointwise/`.
 
 To summarize an already completed Phase 1 sweep without rerunning it:
 
@@ -267,18 +246,6 @@ python -m recpfn.phase1_decision \
   --run-output-dir paper/results_phase1_decision_runs_final \
   --output-dir paper/phase1_decision \
   --reuse-existing
-```
-
-To run the new Phase 2 pointwise validation workflow:
-
-```bash
-python -m recpfn.phase2_pointwise_run \
-  --run-output-dir paper/results_phase2_pointwise_runs
-
-python -m recpfn.phase2_pointwise_report \
-  --run-output-dir paper/results_phase2_pointwise_runs \
-  --output-dir paper/phase2_pointwise \
-  --plots-output-dir paper/figures/phase2_pointwise
 ```
 
 This Phase 2 workflow keeps Phase 1 frozen and focuses on:
