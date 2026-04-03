@@ -1,0 +1,33 @@
+{
+  "artifact_name": "tabpfn-rank-phase2-pointwise-raw-results-2026-04-03.tar.gz",
+  "artifact_type": "github_release_asset",
+  "release_tag": "phase2-pointwise-raw-results-2026-04-03",
+  "release_url": "https://github.com/boubakerwa/tabpfn-rank/releases/tag/phase2-pointwise-raw-results-2026-04-03",
+  "created_at_utc": "2026-04-03T14:49:13Z",
+  "git": {
+    "branch": "main",
+    "commit": "a96c15426835ded101cf9509275f7cba1c15a9ce"
+  },
+  "source": {
+    "path": "paper/results_phase2_pointwise_runs",
+    "file_count": 1841,
+    "size_kib": 431180
+  },
+  "archive": {
+    "format": "tar.gz",
+    "checksum_file": "tabpfn-rank-phase2-pointwise-raw-results-2026-04-03.sha256",
+    "size_bytes": 36749882,
+    "sha256": "8daa6c7427f9ec56bb002ba10cebb5595d6152edb9fc8188b1a0569e3b7c2d2d"
+  },
+  "commands": {
+    "raw_run": "RECPFN_TABPFN_VERSION=v2.5 TABPFN_ALLOW_CPU_LARGE_DATASET=1 .venv311/bin/python -m recpfn.phase2_pointwise_run --run-output-dir paper/results_phase2_pointwise_runs",
+    "report": ".venv311/bin/python -m recpfn.phase2_pointwise_report --run-output-dir paper/results_phase2_pointwise_runs --output-dir paper/phase2_pointwise --plots-output-dir paper/figures/phase2_pointwise",
+    "archive": "tar -C paper -czf /tmp/tabpfn-rank-phase2-pointwise-raw-results-2026-04-03.tar.gz results_phase2_pointwise_runs",
+    "checksum": "shasum -a 256 /tmp/tabpfn-rank-phase2-pointwise-raw-results-2026-04-03.tar.gz"
+  },
+  "notes": [
+    "The raw per-unit run tree is intentionally not tracked in normal git history because it is large and reproducible.",
+    "The tracked summary bundle lives under paper/phase2_pointwise/ and is the primary source for reporting and interpretation.",
+    "This manifest describes the preservation archive for the major Phase 2 pointwise milestone."
+  ]
+}

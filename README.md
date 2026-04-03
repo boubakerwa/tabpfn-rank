@@ -195,13 +195,14 @@ The main Phase 2 evidence bundle is now tracked in-repo:
 - `paper/phase2_pointwise/feature_group_ablation.csv`
 - `paper/phase2_pointwise/raw_summary.csv`
 - `paper/phase2_pointwise/best_tree_selection.json`
+- `paper/phase2_pointwise/raw_results_archive_manifest.json`
 - `paper/figures/phase2_pointwise/adapter_delta_by_train_fraction.png`
 - `paper/figures/phase2_pointwise/runtime_by_train_fraction.png`
 - `paper/figures/phase2_pointwise/metric_by_k.png`
 - `paper/figures/phase2_pointwise/native_minus_one_hot_by_slice.png`
 - `paper/figures/phase2_pointwise/best_tabpfn_vs_best_tree.png`
 
-The raw Phase 2 per-unit run tree under `paper/results_phase2_pointwise_runs/` is intentionally left untracked because it is large (`~421MB`) and reproducible from the committed code.
+The raw Phase 2 per-unit run tree under `paper/results_phase2_pointwise_runs/` is intentionally left untracked because it is large (`~421MB`) and reproducible from the committed code. Major milestone raw trees are preserved as compressed GitHub Release assets, with provenance tracked in `paper/phase2_pointwise/raw_results_archive_manifest.json`.
 
 ## Quickstart
 
