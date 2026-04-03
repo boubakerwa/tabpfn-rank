@@ -20,6 +20,7 @@
 <p align="center">
   <a href="#research-snapshot">Snapshot</a> •
   <a href="#phase-2-findings">Findings</a> •
+  <a href="#public-writeup">Writeup</a> •
   <a href="#tracked-results">Tracked Results</a> •
   <a href="#quickstart">Quickstart</a> •
   <a href="#repo-layout">Repo Layout</a> •
@@ -68,6 +69,14 @@ Phase 1 is frozen. The Phase 2 pointwise validation sweep is now complete, the r
 - The main story is **pointwise TabPFN for small-data and cold-start reranking**.
 - `tabpfn_native` should be described as a **targeted adapter variant**, not the new default.
 - Pairwise TabPFN stays out of the headline unless later evidence changes that.
+
+## Public Writeup
+
+A practitioner-facing Medium-style draft now lives in:
+
+- `paper/phase2_medium_article.md`
+
+It is meant to explain the project as an OSS reranking toolkit, not just as a benchmark result.
 
 ## Core Research Question
 
@@ -196,6 +205,7 @@ The main Phase 2 evidence bundle is now tracked in-repo:
 - `paper/phase2_pointwise/raw_summary.csv`
 - `paper/phase2_pointwise/best_tree_selection.json`
 - `paper/phase2_pointwise/raw_results_archive_manifest.json`
+- `paper/phase2_medium_article.md`
 - `paper/figures/phase2_pointwise/adapter_delta_by_train_fraction.png`
 - `paper/figures/phase2_pointwise/runtime_by_train_fraction.png`
 - `paper/figures/phase2_pointwise/metric_by_k.png`
